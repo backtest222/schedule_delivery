@@ -1,0 +1,218 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Jadwal Pengiriman — alat kerja, bukan halaman pajangan.
+   Tata letak: satu kolom lebar, kartu per PO, baris per truk; dibaca
+   cepat di HP oleh QC di gerbang dan vendor di jalan.
+   Warna pihak sama dengan gambar logika: purchasing biru, vendor hijau, QC jingga.
+------------------------------------------------------------------- */
+@theme {
+  --color-bg: #f2f4f7;
+  --color-surface: #ffffff;
+  --color-ink: #14223a;
+  --color-muted: #586580;
+  --color-line: #d8dee8;
+  --color-brand: #1b4fd0;
+  --color-brand-soft: #e5ecfc;
+  --color-ok: #136c43;
+  --color-ok-soft: #e1f3e8;
+  --color-warn: #8f5400;
+  --color-warn-soft: #ffefd2;
+  --color-danger: #b3261b;
+  --color-danger-soft: #fde7e4;
+
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+html {
+  background: var(--color-bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+  line-height: 1.2;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  /* ----------------------------- Tombol ----------------------------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--color-line);
+    border-radius: 0.5rem;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background-color 120ms, border-color 120ms;
+  }
+  .btn:hover { border-color: var(--color-muted); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-primary {
+    background: var(--color-brand);
+    border-color: var(--color-brand);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #163fa8; border-color: #163fa8; }
+  .btn-danger { color: var(--color-danger); }
+  .btn-danger:hover { border-color: var(--color-danger); background: var(--color-danger-soft); }
+  .btn-sm { min-height: 2rem; padding: 0.25rem 0.625rem; font-size: 0.8125rem; }
+  .btn-link {
+    border: 0;
+    background: none;
+    padding: 0;
+    min-height: 0;
+    color: var(--color-brand);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* ----------------------------- Kartu ------------------------------ */
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 0.75rem;
+  }
+
+  /* ----------------------------- Isian ------------------------------ */
+  .field { display: grid; gap: 0.25rem; }
+  .field > span { font-weight: 600; font-size: 0.8125rem; }
+  .field > small { color: var(--color-muted); font-size: 0.8125rem; }
+  .input {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: 0.5rem;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font: inherit;
+  }
+  .input:focus { border-color: var(--color-brand); }
+  textarea.input { min-height: 5rem; resize: vertical; }
+
+  /* ----------------------------- Label status ----------------------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: #e9edf3;
+    color: var(--color-ink);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .pill-info { background: var(--color-brand-soft); color: var(--color-brand); }
+  .pill-ok { background: var(--color-ok-soft); color: var(--color-ok); }
+  .pill-warn { background: var(--color-warn-soft); color: var(--color-warn); }
+  .pill-danger { background: var(--color-danger-soft); color: var(--color-danger); }
+
+  /* Nomor polisi ditulis seperti pelat: putih, huruf hitam tebal, bingkai hitam. */
+  .plate {
+    display: inline-block;
+    padding: 0.0625rem 0.5rem;
+    border: 2px solid var(--color-ink);
+    border-radius: 0.3125rem;
+    background: #fff;
+    color: #0b0f17;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.875rem;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .mono { font-family: var(--font-mono); }
+
+  /* ----------------------------- Batang capaian --------------------- */
+  .bar {
+    position: relative;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: #e3e8ef;
+    overflow: hidden;
+  }
+  .bar > i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    display: block;
+  }
+  .bar > .bar-planned { background: #a9c0f2; }
+  .bar > .bar-done { background: var(--color-ok); }
+
+  /* ----------------------------- Tabel ------------------------------ */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .tbl th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: var(--color-muted);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-line);
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  .tbl td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--color-line);
+    vertical-align: top;
+  }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .note {
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+  }
+  .note-danger { background: var(--color-danger-soft); color: var(--color-danger); }
+  .note-warn { background: var(--color-warn-soft); color: var(--color-warn); }
+  .note-info { background: var(--color-brand-soft); color: var(--color-ink); }
+}
+
+dialog.modal {
+  width: min(34rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 1.5rem);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 0.875rem;
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+dialog.modal::backdrop { background: rgb(20 34 58 / 0.45); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
