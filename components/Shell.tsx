@@ -28,6 +28,24 @@ export const isBuyer = (p: Profile) => p.role === "admin" || p.role === "purchas
 export const isInternal = (p: Profile) => p.role !== "vendor";
 export const canReceive = (p: Profile) => p.role === "qc" || p.role === "admin";
 
+/** Tapal kuda kecil sebagai tanda pengenal. */
+export function Horseshoe({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M6.5 3.5C4.6 6 3.5 8.9 3.5 12a8.5 8.5 0 0 0 17 0c0-3.1-1.1-6-3-8.5"
+        fill="none"
+        stroke="#e7bf5f"
+        strokeWidth="3.4"
+        strokeLinecap="round"
+      />
+      {[[5.6, 9], [5.4, 13.6], [7.6, 17.6], [18.4, 9], [18.6, 13.6], [16.4, 17.6]].map(([cx, cy]) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="0.75" fill="#3a2617" />
+      ))}
+    </svg>
+  );
+}
+
 function Notice({ title, children }: { title: string; children: ReactNode }) {
   return (
     <main className="mx-auto max-w-md px-4 py-16">
@@ -149,19 +167,20 @@ export default function Shell({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ profile, unread, refreshUnread, markSeen }}>
-      <header className="sticky top-0 z-10 border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2">
-          <Link href="/" className="text-base font-extrabold tracking-tight">
+      <header className="ranch-bar sticky top-0 z-10">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-2">
+          <Link href="/" className="flex items-center gap-2 text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>
+            <Horseshoe />
             Jadwal Pengiriman
           </Link>
           <div className="ml-auto flex items-center gap-2 text-sm">
-            <span className="hidden text-muted sm:inline">{profile.full_name}</span>
-            <span className="pill">{ROLE_LABEL[profile.role]}</span>
-            <button type="button" className="btn btn-sm" onClick={signOut}>
+            <span className="hidden opacity-80 sm:inline">{profile.full_name}</span>
+            <span className="ranch-chip">{ROLE_LABEL[profile.role]}</span>
+            <button type="button" className="btn btn-sm ranch-btn" onClick={signOut}>
               Keluar
             </button>
           </div>
-          <nav aria-label="Menu utama" className="-mx-1 flex w-full gap-1 overflow-x-auto">
+          <nav aria-label="Menu utama" className="ranch-nav -mx-1 flex w-full gap-1 overflow-x-auto pb-2">
             {links.map((l) => {
               const active = l.href === "/" ? pathname === "/" || pathname.startsWith("/po/") : pathname.startsWith(l.href);
               return (
@@ -169,9 +188,7 @@ export default function Shell({ children }: { children: ReactNode }) {
                   key={l.href}
                   href={l.href}
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold whitespace-nowrap ${
-                    active ? "bg-brand-soft text-brand" : "text-muted hover:text-ink"
-                  }`}
+                  className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold whitespace-nowrap"
                 >
                   {l.label}
                   {l.badge ? (

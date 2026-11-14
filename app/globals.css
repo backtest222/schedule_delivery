@@ -1,28 +1,37 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------
-   Jadwal Pengiriman — alat kerja, bukan halaman pajangan.
-   Tata letak: satu kolom lebar, kartu per PO, baris per truk; dibaca
-   cepat di HP oleh QC di gerbang dan vendor di jalan.
-   Warna pihak sama dengan gambar logika: purchasing biru, vendor hijau, QC jingga.
+   Jadwal Pengiriman — nuansa ranch (farm / cowboy).
+   Bahan: papan kayu kandang, kulit pelana berjahit, jerami, denim.
+   Keberanian ditaruh di satu tempat: papan nama kayu di atas halaman
+   dengan jahitan putus-putus. Sisanya tenang agar tetap enak dipakai
+   QC di gerbang dan vendor di jalan.
+   Warna pihak: purchasing = kulit pelana, vendor = hijau padang, QC = jerami.
 ------------------------------------------------------------------- */
 @theme {
-  --color-bg: #f2f4f7;
-  --color-surface: #ffffff;
-  --color-ink: #14223a;
-  --color-muted: #586580;
-  --color-line: #d8dee8;
-  --color-brand: #1b4fd0;
-  --color-brand-soft: #e5ecfc;
-  --color-ok: #136c43;
-  --color-ok-soft: #e1f3e8;
-  --color-warn: #8f5400;
-  --color-warn-soft: #ffefd2;
-  --color-danger: #b3261b;
-  --color-danger-soft: #fde7e4;
+  --color-bg: #efe5d2;          /* tanah kering */
+  --color-surface: #fffaf1;     /* kertas surat jalan */
+  --color-hover: #f6ecdb;
+  --color-ink: #2a1c12;         /* kayu walnut tua */
+  --color-muted: #6e5944;
+  --color-line: #dcc9a8;
+  --color-brand: #7a4519;       /* kulit pelana */
+  --color-brand-dark: #5e3412;
+  --color-brand-soft: #f2e1cb;
+  --color-hay: #e7bf5f;         /* jerami */
+  --color-denim: #2e4d6f;
+  --color-denim-soft: #dfe7ef;
+  --color-ok: #3d6a26;          /* padang rumput */
+  --color-ok-soft: #e3ecd4;
+  --color-warn: #875600;
+  --color-warn-soft: #f8e7bd;
+  --color-danger: #a4271c;      /* cat merah kandang */
+  --color-danger-soft: #f9e0da;
+  --color-wood: #3a2617;
 
-  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-display: "Rye", "Rockwell", Georgia, serif;
+  --font-sans: "Bitter", "Rockwell", Georgia, serif;
+  --font-mono: "Roboto Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
 html {
@@ -32,11 +41,17 @@ html {
 
 body {
   min-height: 100dvh;
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  /* Serat halus seperti papan tua, sangat samar agar tidak mengganggu teks. */
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgb(122 69 25 / 0.035) 0 1px,
+    transparent 1px 7px
+  );
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 0.9375rem;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 h1, h2, h3 {
@@ -44,8 +59,15 @@ h1, h2, h3 {
   line-height: 1.2;
 }
 
+/* Judul halaman memakai huruf papan nama western. Rye hanya punya satu ketebalan. */
+h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
 :focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--color-denim);
   outline-offset: 2px;
 }
 
@@ -53,7 +75,75 @@ h1, h2, h3 {
   font-variant-numeric: tabular-nums;
 }
 
+/* Nomor PO: huruf biasa, bukan mesin ketik, supaya "PO" tidak terbaca "P0".
+   Angka nol tetap diberi garis miring bila hurufnya mendukung. */
+.po-no {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums slashed-zero;
+  letter-spacing: 0.02em;
+}
+
+/* Nopol, surat jalan, password: Roboto Mono, yang angka nolnya bergaris miring (Ø)
+   sehingga tidak tertukar dengan huruf O. */
+.mono,
+.plate {
+  font-family: var(--font-mono);
+  font-variant-numeric: slashed-zero;
+  font-feature-settings: "zero" 1;
+}
+
 @layer components {
+  /* ------------------------ Papan nama (header) --------------------- */
+  .ranch-bar {
+    position: relative;
+    background-color: var(--color-wood);
+    background-image:
+      repeating-linear-gradient(90deg, rgb(255 255 255 / 0.03) 0 2px, transparent 2px 11px),
+      linear-gradient(180deg, #4a3220, #33210f);
+    color: #f6ead3;
+    padding-bottom: 0.5rem;
+  }
+  /* Jahitan kulit di tepi bawah papan. */
+  .ranch-bar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0.3125rem;
+    border-top: 2px dashed rgb(246 234 211 / 0.4);
+    pointer-events: none;
+  }
+  .ranch-nav a {
+    color: rgb(246 234 211 / 0.78);
+  }
+  .ranch-nav a:hover {
+    color: #fff;
+  }
+  .ranch-nav a[aria-current="page"] {
+    background: var(--color-hay);
+    color: var(--color-wood);
+  }
+  .ranch-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border: 1px solid rgb(246 234 211 / 0.35);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #f6ead3;
+  }
+  .ranch-btn {
+    border-color: rgb(246 234 211 / 0.45);
+    background: transparent;
+    color: #f6ead3;
+  }
+  .ranch-btn:hover {
+    border-color: #f6ead3;
+    background: rgb(246 234 211 / 0.08);
+  }
+
   /* ----------------------------- Tombol ----------------------------- */
   .btn {
     display: inline-flex;
@@ -63,9 +153,10 @@ h1, h2, h3 {
     min-height: 2.5rem;
     padding: 0.5rem 0.875rem;
     border: 1px solid var(--color-line);
-    border-radius: 0.5rem;
+    border-radius: 0.375rem;
     background: var(--color-surface);
     color: var(--color-ink);
+    font-family: var(--font-sans);
     font-weight: 600;
     font-size: 0.875rem;
     line-height: 1.2;
@@ -74,12 +165,14 @@ h1, h2, h3 {
   }
   .btn:hover { border-color: var(--color-muted); }
   .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  /* Tombol utama seperti kulit pelana: cokelat dengan jahitan di dalamnya. */
   .btn-primary {
     background: var(--color-brand);
-    border-color: var(--color-brand);
-    color: #fff;
+    border-color: var(--color-brand-dark);
+    color: #fff8ec;
+    box-shadow: inset 0 0 0 2px var(--color-brand), inset 0 0 0 3px rgb(255 248 236 / 0.35);
   }
-  .btn-primary:hover { background: #163fa8; border-color: #163fa8; }
+  .btn-primary:hover { background: var(--color-brand-dark); border-color: var(--color-brand-dark); }
   .btn-danger { color: var(--color-danger); }
   .btn-danger:hover { border-color: var(--color-danger); background: var(--color-danger-soft); }
   .btn-sm { min-height: 2rem; padding: 0.25rem 0.625rem; font-size: 0.8125rem; }
@@ -88,7 +181,7 @@ h1, h2, h3 {
     background: none;
     padding: 0;
     min-height: 0;
-    color: var(--color-brand);
+    color: var(--color-denim);
     font-weight: 600;
     cursor: pointer;
     text-decoration: underline;
@@ -99,7 +192,8 @@ h1, h2, h3 {
   .card {
     background: var(--color-surface);
     border: 1px solid var(--color-line);
-    border-radius: 0.75rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 0 rgb(122 69 25 / 0.08);
   }
 
   /* ----------------------------- Isian ------------------------------ */
@@ -111,12 +205,13 @@ h1, h2, h3 {
     min-height: 2.75rem;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--color-line);
-    border-radius: 0.5rem;
-    background: var(--color-surface);
+    border-radius: 0.375rem;
+    background: #fffdf8;
     color: var(--color-ink);
     font: inherit;
   }
-  .input:focus { border-color: var(--color-brand); }
+  .input:focus { border-color: var(--color-denim); }
+  .input.po-no { font-weight: 700; }
   textarea.input { min-height: 5rem; resize: vertical; }
 
   /* ----------------------------- Label status ----------------------- */
@@ -126,14 +221,14 @@ h1, h2, h3 {
     gap: 0.25rem;
     padding: 0.125rem 0.5rem;
     border-radius: 999px;
-    background: #e9edf3;
+    background: #eadfcb;
     color: var(--color-ink);
     font-size: 0.75rem;
     font-weight: 600;
     line-height: 1.5;
     white-space: nowrap;
   }
-  .pill-info { background: var(--color-brand-soft); color: var(--color-brand); }
+  .pill-info { background: var(--color-denim-soft); color: var(--color-denim); }
   .pill-ok { background: var(--color-ok-soft); color: var(--color-ok); }
   .pill-warn { background: var(--color-warn-soft); color: var(--color-warn); }
   .pill-danger { background: var(--color-danger-soft); color: var(--color-danger); }
@@ -142,25 +237,22 @@ h1, h2, h3 {
   .plate {
     display: inline-block;
     padding: 0.0625rem 0.5rem;
-    border: 2px solid var(--color-ink);
+    border: 2px solid #17110b;
     border-radius: 0.3125rem;
     background: #fff;
-    color: #0b0f17;
-    font-family: var(--font-mono);
+    color: #0b0805;
     font-weight: 600;
     font-size: 0.875rem;
     letter-spacing: 0.04em;
     white-space: nowrap;
   }
 
-  .mono { font-family: var(--font-mono); }
-
   /* ----------------------------- Batang capaian --------------------- */
   .bar {
     position: relative;
     height: 0.5rem;
     border-radius: 999px;
-    background: #e3e8ef;
+    background: #e6d8bf;
     overflow: hidden;
   }
   .bar > i {
@@ -168,7 +260,7 @@ h1, h2, h3 {
     inset: 0 auto 0 0;
     display: block;
   }
-  .bar > .bar-planned { background: #a9c0f2; }
+  .bar > .bar-planned { background: var(--color-hay); }
   .bar > .bar-done { background: var(--color-ok); }
 
   /* ----------------------------- Tabel ------------------------------ */
@@ -193,12 +285,12 @@ h1, h2, h3 {
 
   .note {
     padding: 0.625rem 0.75rem;
-    border-radius: 0.5rem;
+    border-radius: 0.375rem;
     font-size: 0.875rem;
   }
   .note-danger { background: var(--color-danger-soft); color: var(--color-danger); }
   .note-warn { background: var(--color-warn-soft); color: var(--color-warn); }
-  .note-info { background: var(--color-brand-soft); color: var(--color-ink); }
+  .note-info { background: var(--color-denim-soft); color: var(--color-ink); }
 }
 
 dialog.modal {
@@ -207,11 +299,11 @@ dialog.modal {
   margin: auto;
   padding: 0;
   border: 1px solid var(--color-line);
-  border-radius: 0.875rem;
+  border-radius: 0.625rem;
   background: var(--color-surface);
   color: var(--color-ink);
 }
-dialog.modal::backdrop { background: rgb(20 34 58 / 0.45); }
+dialog.modal::backdrop { background: rgb(42 28 18 / 0.5); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }

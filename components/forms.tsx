@@ -69,7 +69,7 @@ export function POForm({
     <Modal title={po ? "Ubah PO" : "Buat PO"} onClose={onClose}>
       <form onSubmit={submit} className="grid gap-4">
         <Field label="Nomor PO">
-          <input id="po-number" className="input mono" required value={number} onChange={(e) => setNumber(e.target.value)} />
+          <input id="po-number" className="input po-no" required value={number} onChange={(e) => setNumber(e.target.value)} />
         </Field>
         <Field label="Vendor" hint={hasTrucks ? "Tidak bisa diganti karena PO ini sudah punya truk." : undefined}>
           <select id="po-vendor" className="input" required disabled={hasTrucks} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
@@ -256,7 +256,7 @@ export function TruckForm({
     <Modal title={truck ? "Ubah data truk" : unregistered ? "Catat truk tak terdaftar" : "Daftarkan truk"} onClose={onClose}>
       <form onSubmit={submit} className="grid gap-4">
         <p className="text-sm text-muted">
-          PO <span className="mono">{po.po_number}</span> · {po.vendor.name} · {po.product.name}
+          PO <span className="po-no">{po.po_number}</span> · {po.vendor.name} · {po.product.name}
           {unregistered ? ". Truk ini akan ditandai datang tanpa didaftarkan vendor." : ""}
         </p>
         <Field label="Untuk jadwal">
@@ -360,7 +360,7 @@ export function ReceiptForm({ po, truck, onClose, onDone }: { po: PO; truck: Tru
             <span className="plate">{truck.plate_number}</span> · {po.vendor.name} · {po.product.name}
           </p>
           <p>
-            PO <span className="mono">{po.po_number}</span> · netto vendor <strong className="num">{fmtKg(truck.vendor_net_kg)}</strong>
+            PO <span className="po-no">{po.po_number}</span> · netto vendor <strong className="num">{fmtKg(truck.vendor_net_kg)}</strong>
             {truck.registered_by_qc ? " · tak terdaftar" : ""}
           </p>
         </div>

@@ -41,11 +41,11 @@ function AttentionList({ items }: { items: Attention[] }) {
         <ul className="mt-2">
           {shown.map((a) => (
             <li key={a.key} className="border-t border-line">
-              <Link href={a.href} className="flex items-start gap-2 px-4 py-2.5 text-sm hover:bg-bg">
+              <Link href={a.href} className="flex items-start gap-2 px-4 py-2.5 text-sm hover:bg-hover">
                 <span
                   aria-hidden="true"
                   className={`mt-1.5 size-2 shrink-0 rounded-full ${
-                    a.tone === "danger" ? "bg-danger" : a.tone === "warn" ? "bg-warn" : "bg-brand"
+                    a.tone === "danger" ? "bg-danger" : a.tone === "warn" ? "bg-warn" : "bg-denim"
                   }`}
                 />
                 <span>{a.text}</span>
@@ -75,7 +75,7 @@ function PoCard({ po, today }: { po: PO; today: string }) {
       <Link href={`/po/${po.id}`} className="card grid gap-2 p-4 hover:border-muted">
         <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
           <div className="mr-auto min-w-0">
-            <p className="mono font-semibold break-words">{po.po_number}</p>
+            <p className="po-no break-words">{po.po_number}</p>
             <p className="text-sm text-muted">
               {po.vendor.name} · {po.product.name}
             </p>
@@ -396,7 +396,7 @@ export function QcDashboard() {
                       {po.vendor.name} · {po.product.name}
                       <br />
                       <span className="text-muted">
-                        PO <span className="mono">{po.po_number}</span> · berangkat {fmtDateTime(truck.departure_at)}
+                        PO <span className="po-no">{po.po_number}</span> · berangkat {fmtDateTime(truck.departure_at)}
                       </span>
                     </p>
                     <p className="text-sm">
@@ -489,7 +489,7 @@ export function QcDashboard() {
                 .map((po) => (
                   <li key={po.id}>
                     <button type="button" className="card w-full p-3 text-left hover:border-muted" onClick={() => setModal({ t: "truck", po })}>
-                      <span className="mono font-semibold">{po.po_number}</span>
+                      <span className="po-no">{po.po_number}</span>
                       <br />
                       <span className="text-sm text-muted">
                         {po.vendor.name} · {po.product.name}

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { db } from "@/lib/supabase";
 import { ErrorNote, Field, useAction } from "@/components/ui";
+import { Horseshoe } from "@/components/Shell";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -23,8 +24,14 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto max-w-sm px-4 py-14">
-      <h1 className="text-2xl font-extrabold tracking-tight">Jadwal Pengiriman</h1>
-      <p className="mt-1 text-sm text-muted">
+      <div className="ranch-bar -mx-4 mb-2 rounded-lg px-4 pt-4 pb-5 sm:mx-0">
+        <h1 className="flex items-center gap-3 text-[1.75rem] leading-none">
+          <Horseshoe size={34} />
+          Jadwal Pengiriman
+        </h1>
+        <p className="mt-2 text-sm opacity-80">Dari PO sampai truk masuk gerbang.</p>
+      </div>
+      <p className="mt-4 text-sm text-muted">
         Masuk dengan akun yang diberikan purchasing. Vendor hanya melihat PO miliknya sendiri.
       </p>
       <form onSubmit={submit} className="card mt-6 grid gap-4 p-4">

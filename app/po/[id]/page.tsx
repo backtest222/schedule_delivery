@@ -120,7 +120,7 @@ export default function PoPage() {
         </Link>
         <div className="mt-2 flex flex-wrap items-start gap-x-3 gap-y-2">
           <div className="min-w-0 flex-1">
-            <h1 className="mono text-xl font-semibold break-words">{po.po_number}</h1>
+            <h1 className="po-no text-2xl break-words">{po.po_number}</h1>
             <p className="text-muted">
               {po.vendor.name} · {po.product.name}
             </p>
@@ -609,7 +609,7 @@ function AuditSection({ poId }: { poId: string }) {
         onClick={() => setOpened((o) => !o)}
       >
         Riwayat perubahan
-        <span className="text-sm font-semibold text-brand">{opened ? "Sembunyikan" : "Tampilkan"}</span>
+        <span className="text-sm font-semibold text-denim">{opened ? "Sembunyikan" : "Tampilkan"}</span>
       </button>
       {opened ? <AuditList poId={poId} /> : null}
     </section>

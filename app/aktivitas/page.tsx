@@ -42,9 +42,9 @@ export default function ActivityPage() {
             const fresh = a.created_at > seenAt.current && a.actor !== profile.id;
             return (
               <li key={a.id} className="border-b border-line last:border-b-0">
-                <Link href={`/po/${a.po_id}`} className="grid gap-1 px-4 py-3 hover:bg-bg">
+                <Link href={`/po/${a.po_id}`} className="grid gap-1 px-4 py-3 hover:bg-hover">
                   <span className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                    <span className="mono font-semibold text-ink">{String(a.data.po_number ?? "")}</span>
+                    <span className="po-no text-ink">{String(a.data.po_number ?? "")}</span>
                     {fmtDateTime(a.created_at)}
                     {fresh ? <Pill tone="danger">Baru</Pill> : null}
                     {a.actor === profile.id ? <Pill>Oleh Anda</Pill> : null}
