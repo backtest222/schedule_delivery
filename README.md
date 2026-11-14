@@ -20,6 +20,8 @@ Website untuk komunikasi jadwal dan realisasi pengiriman barang setelah PO, anta
 - ETA awal tetap disimpan saat jadwal direvisi. Ketepatan waktu dilaporkan terhadap keduanya, menurut volume.
 - PO yang ditutup menolak truk baru; truk yang sudah terdaftar tetap bisa diterima.
 - Setiap perubahan tercatat di riwayat (siapa, kapan, dari apa menjadi apa).
+- Admin dan purchasing wajib verifikasi dua langkah; aturannya ada di database.
+- Cadangan data otomatis setiap minggu, dan admin bisa mengunduh cadangan kapan saja.
 
 ## Struktur
 
@@ -41,7 +43,7 @@ npm test        # uji perhitungan (selisih, ketepatan waktu, total PO)
 npm run build   # periksa bahwa website siap di-deploy
 ```
 
-Uji aturan akses (`tests/rls_test.sql`) dijalankan di Postgres biasa setelah `tests/local_stub.sql` dan `supabase/migrations/001_schema.sql`.
+Uji aturan akses (`tests/rls_test.sql`) dijalankan di Postgres biasa setelah `tests/local_stub.sql` dan ketiga file di `supabase/migrations/`.
 
 ## Teknologi
 

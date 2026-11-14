@@ -87,18 +87,45 @@ export async function loadAudit(poId: string): Promise<AuditEntry[]> {
   return data as AuditEntry[];
 }
 
-/** Memanggil rute server pengelola akun dengan token login pengguna. */
-export async function callUsersApi(body: Record<string, unknown>): Promise<void> {
+async function bearer(): Promise<string> {
   const { data } = await db().auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error("Sesi login habis. Silakan login ulang.");
+  return token;
+}
+
+/** Memanggil rute server pengelola akun dengan token login pengguna. */
+export async function callUsersApi<T = { ok: true }>(body: Record<string, unknown>): Promise<T> {
   const res = await fetch("/api/users", {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    headers: { "content-type": "application/json", authorization: `Bearer ${await bearer()}` },
     body: JSON.stringify(body),
   });
+  const json = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new Error(json.error ?? "Permintaan gagal. Coba lagi.");
+  return json;
+}
+
+export type AccountInfo = Record<string, { last_sign_in_at: string | null; mfa: boolean }>;
+
+/** Login terakhir dan status verifikasi dua langkah tiap akun yang boleh dikelola pemanggil. */
+export async function loadAccountInfo(): Promise<AccountInfo> {
+  return (await callUsersApi<{ users: AccountInfo }>({ action: "overview" })).users;
+}
+
+/** Mengunduh cadangan seluruh data (hanya admin). */
+export async function downloadBackup(): Promise<void> {
+  const res = await fetch("/api/backup", { headers: { authorization: `Bearer ${await bearer()}` } });
   if (!res.ok) {
-    const j = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(j.error ?? "Permintaan gagal. Coba lagi.");
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(json.error ?? "Cadangan gagal diunduh.");
   }
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `cadangan-jadwal-pengiriman-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 }

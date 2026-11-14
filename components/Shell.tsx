@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { db, isConfigured } from "@/lib/supabase";
 import { countUnread } from "@/lib/data";
 import { ROLE_LABEL, type Profile } from "@/lib/types";
+import MfaGate from "./Mfa";
 import { Loading } from "./ui";
 
 type Auth = {
@@ -26,6 +27,20 @@ export function useAuth(): Auth {
 
 export const isBuyer = (p: Profile) => p.role === "admin" || p.role === "purchasing";
 export const isInternal = (p: Profile) => p.role !== "vendor";
+/** Admin dan purchasing wajib verifikasi dua langkah. */
+const needsMfa = (p: Profile) => p.role === "admin" || p.role === "purchasing";
+
+/** Tingkat verifikasi di dalam token login: "aal2" = sudah lewat dua langkah. */
+function aalOf(token: string | undefined): string | null {
+  if (!token) return null;
+  try {
+    const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return (JSON.parse(atob(part)) as { aal?: string }).aal ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export const canReceive = (p: Profile) => p.role === "qc" || p.role === "admin";
 
 /** Tapal kuda kecil sebagai tanda pengenal. */
@@ -64,12 +79,17 @@ export default function Shell({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [unread, setUnread] = useState(0);
+  const [aal, setAal] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isConfigured) return;
     const client = db();
-    void client.auth.getSession().then(({ data }) => setUserId(data.session?.user.id ?? null));
+    void client.auth.getSession().then(({ data }) => {
+      setAal(aalOf(data.session?.access_token));
+      setUserId(data.session?.user.id ?? null);
+    });
     const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
+      setAal(aalOf(session?.access_token));
       setUserId(session?.user.id ?? null);
     });
     return () => sub.subscription.unsubscribe();
@@ -96,11 +116,12 @@ export default function Shell({ children }: { children: ReactNode }) {
     };
   }, [userId]);
 
-  const ready = Boolean(profile && profile.active);
+  const mfaPending = Boolean(profile && profile.active && needsMfa(profile) && aal !== "aal2");
+  const ready = Boolean(profile && profile.active) && !mfaPending;
 
   const refreshUnread = useCallback(() => {
-    if (profile && profile.active) void countUnread(profile).then(setUnread);
-  }, [profile]);
+    if (profile && ready) void countUnread(profile).then(setUnread);
+  }, [profile, ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -122,8 +143,9 @@ export default function Shell({ children }: { children: ReactNode }) {
   const onLogin = pathname === "/login";
   useEffect(() => {
     if (userId === null && !onLogin) router.replace("/login");
-    if (userId && onLogin && ready) router.replace("/");
-  }, [userId, onLogin, ready, router]);
+    // Setelah login, pindah ke Beranda; di sana verifikasi dua langkah ditampilkan bila perlu.
+    if (userId && onLogin && profile !== undefined) router.replace("/");
+  }, [userId, onLogin, profile, router]);
 
   if (!isConfigured) {
     return (
@@ -157,6 +179,8 @@ export default function Shell({ children }: { children: ReactNode }) {
       </Notice>
     );
   }
+
+  if (mfaPending) return <MfaGate name={profile.full_name} onSignOut={signOut} />;
 
   const links = [
     { href: "/", label: "Beranda", show: true },

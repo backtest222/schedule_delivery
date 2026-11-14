@@ -1,5 +1,5 @@
 -- Uji aturan akses. Jalankan di database uji yang sudah diisi
--- tests/local_stub.sql lalu supabase/migrations/001_schema.sql:
+-- tests/local_stub.sql lalu ketiga file di supabase/migrations/ secara berurutan:
 --   psql -v ON_ERROR_STOP=1 -f tests/rls_test.sql
 -- Semua perubahan dibatalkan di akhir (rollback). Bila ada aturan yang bocor, skrip berhenti dengan "FAIL".
 \set ON_ERROR_STOP on
@@ -63,9 +63,19 @@ select pg_temp.must_fail('select 1 from public.purchase_orders', 'anon tidak bis
 select pg_temp.must_fail('select 1 from public.vendors', 'anon tidak bisa membaca vendor');
 reset role;
 
+-- ---------- Purchasing tanpa 2FA (password saja) ----------
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","aal":"aal1"}', true);
+select pg_temp.expect((select count(*) = 0 from public.vendors), 'purchasing tanpa 2FA tidak melihat vendor');
+select pg_temp.expect((select count(*) = 1 from public.profiles), 'purchasing tanpa 2FA hanya melihat profilnya sendiri');
+select pg_temp.must_fail($$insert into public.purchase_orders (po_number, vendor_id, product_id, volume_kg) values ('PO-NO2FA', '10000000-0000-0000-0000-00000000000a', '20000000-0000-0000-0000-000000000001', 1)$$, 'purchasing tanpa 2FA tidak bisa membuat PO');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a"}', true);
+select pg_temp.expect((select count(*) = 0 from public.vendors), 'admin tanpa 2FA tidak melihat vendor');
+reset role;
+
 -- ---------- Purchasing ----------
 set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b"}', true);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","aal":"aal2"}', true);
 
 insert into public.purchase_orders (id, po_number, vendor_id, product_id, volume_kg) values
   ('30000000-0000-0000-0000-00000000000a', 'PO-A-001', '10000000-0000-0000-0000-00000000000a', '20000000-0000-0000-0000-000000000001', 100000),
@@ -162,7 +172,7 @@ select pg_temp.expect((select count(*) = 0 from public.receipts), 'vendor B tida
 select pg_temp.expect((select count(*) = 1 from public.activity where kind = 'truck_unregistered'), 'vendor B diberi tahu truknya datang tanpa didaftarkan');
 
 -- ---------- Purchasing: usulan, penutupan, perubahan vendor ----------
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b"}', true);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","aal":"aal2"}', true);
 select pg_temp.expect((select count(*) = 1 from public.activity where kind = 'proposal_new'), 'purchasing melihat usulan baru');
 update public.schedule_proposals set status = 'approved', decision_note = 'Setuju' where id = '60000000-0000-0000-0000-00000000000a';
 select pg_temp.expect((select eta_current = '2026-12-20' and eta_original = '2026-12-15' from public.schedules where id = '40000000-0000-0000-0000-0000000000a2'), 'persetujuan mengubah ETA revisi, ETA awal tetap');
@@ -185,9 +195,28 @@ insert into public.receipts (truck_id, arrived_at, factory_net_kg) values ('5000
 select pg_temp.expect((select status = 'received' from public.trucks where id = '50000000-0000-0000-0000-0000000000a2'), 'truk yang sudah terdaftar tetap bisa diterima setelah PO ditutup');
 
 -- ---------- Admin ----------
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a"}', true);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","aal":"aal2"}', true);
 select pg_temp.must_touch($$delete from public.receipts where truck_id = '50000000-0000-0000-0000-0000000000a2'$$, 1, 'admin boleh menghapus penerimaan');
 select pg_temp.expect((select status = 'planned' from public.trucks where id = '50000000-0000-0000-0000-0000000000a2'), 'menghapus penerimaan mengembalikan status truk');
+
+
+-- ---------- Foto dan cadangan ----------
+reset role;
+insert into storage.objects (bucket_id, name) values
+  ('receipt-photos', '30000000-0000-0000-0000-00000000000a/50000000-0000-0000-0000-0000000000a1/1.jpg'),
+  ('backups', 'backup-2026-12-01.json');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1"}', true);
+select pg_temp.expect((select count(*) = 1 from storage.objects), 'vendor A melihat foto truknya, tidak melihat cadangan');
+select pg_temp.must_fail($$insert into storage.objects (bucket_id, name) values ('receipt-photos', '30000000-0000-0000-0000-00000000000a/x/2.jpg')$$, 'vendor tidak bisa mengunggah foto');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1"}', true);
+select pg_temp.expect((select count(*) = 0 from storage.objects), 'vendor B tidak melihat foto vendor A maupun cadangan');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000c"}', true);
+select pg_temp.expect((select count(*) = 1 from storage.objects), 'QC melihat foto tetapi tidak melihat cadangan');
+insert into storage.objects (bucket_id, name) values ('receipt-photos', '30000000-0000-0000-0000-00000000000a/50000000-0000-0000-0000-0000000000a2/1.jpg');
+select pg_temp.must_fail($$insert into storage.objects (bucket_id, name) values ('backups', 'x.json')$$, 'QC tidak bisa menulis ke tempat cadangan');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","aal":"aal2"}', true);
+select pg_temp.expect((select count(*) = 0 from storage.objects where bucket_id = 'backups'), 'admin pun tidak membaca cadangan lewat browser, hanya server');
 
 reset role;
 rollback;

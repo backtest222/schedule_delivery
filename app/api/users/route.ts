@@ -1,38 +1,20 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
+import { fail, getCaller, type Role } from "@/lib/server/caller";
 
 /**
- * Pengelolaan akun. Hanya rute ini yang memakai kunci rahasia Supabase.
- * - Admin boleh membuat dan mengubah semua akun.
+ * Pengelolaan akun. Rute server memakai kunci rahasia Supabase.
+ * - Admin boleh membuat dan mengubah semua akun, serta mereset verifikasi dua langkah.
  * - Purchasing hanya boleh membuat dan mengubah akun vendor.
- * Pemanggil dikenali dari token login yang dikirim di header Authorization.
  */
 
-const ROLES = ["admin", "purchasing", "qc", "vendor"] as const;
-type Role = (typeof ROLES)[number];
-
-const fail = (status: number, error: string) => Response.json({ error }, { status });
+const ROLES: Role[] = ["admin", "purchasing", "qc", "vendor"];
+const MIN_PASSWORD = 12;
 const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
 export async function POST(request: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const secret = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !secret) return fail(500, "SUPABASE_SECRET_KEY belum diisi di server.");
-
-  const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return fail(401, "Sesi login tidak ditemukan. Silakan login ulang.");
-
-  const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
-
-  const { data: userData, error: userError } = await admin.auth.getUser(token);
-  if (userError || !userData.user) return fail(401, "Sesi login habis. Silakan login ulang.");
-  const callerId = userData.user.id;
-
-  const { data: caller } = await admin.from("profiles").select("role, active").eq("id", callerId).maybeSingle();
-  const callerRole = caller?.active ? (caller.role as Role) : null;
-  if (callerRole !== "admin" && callerRole !== "purchasing") {
-    return fail(403, "Akun Anda tidak punya izin mengelola akun.");
-  }
+  const caller = await getCaller(request);
+  if (caller instanceof Response) return caller;
+  const { admin, callerId, role: callerRole } = caller;
   const mayManage = (role: Role) => callerRole === "admin" || role === "vendor";
 
   let body: Record<string, unknown>;
@@ -40,6 +22,26 @@ export async function POST(request: Request) {
     body = (await request.json()) as Record<string, unknown>;
   } catch {
     return fail(400, "Permintaan tidak bisa dibaca.");
+  }
+
+  // Login terakhir dan status verifikasi dua langkah tiap akun.
+  if (body.action === "overview") {
+    const { data: profiles } = await admin.from("profiles").select("id, role");
+    const visible = new Set((profiles ?? []).filter((p) => mayManage(p.role as Role)).map((p) => p.id as string));
+    const users: Record<string, { last_sign_in_at: string | null; mfa: boolean }> = {};
+    for (let page = 1; page <= 50; page += 1) {
+      const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+      if (error) return fail(500, `Daftar akun gagal dibaca: ${error.message}`);
+      for (const u of data.users) {
+        if (!visible.has(u.id)) continue;
+        users[u.id] = {
+          last_sign_in_at: u.last_sign_in_at ?? null,
+          mfa: (u.factors ?? []).some((f) => f.status === "verified"),
+        };
+      }
+      if (data.users.length < 200) break;
+    }
+    return Response.json({ users });
   }
 
   if (body.action === "create") {
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
 
     if (!fullName) return fail(400, "Isi nama pengguna.");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(400, "Alamat email tidak valid.");
-    if (password.length < 8) return fail(400, "Password minimal 8 karakter.");
+    if (password.length < MIN_PASSWORD) return fail(400, `Password minimal ${MIN_PASSWORD} karakter.`);
     if (!ROLES.includes(role)) return fail(400, "Peran tidak dikenal.");
     if (!mayManage(role)) return fail(403, "Purchasing hanya boleh membuat akun vendor.");
     if (role === "vendor" && !vendorId) return fail(400, "Pilih vendor untuk akun ini.");
@@ -81,15 +83,26 @@ export async function POST(request: Request) {
     return Response.json({ ok: true });
   }
 
-  if (body.action === "update") {
+  if (body.action === "update" || body.action === "reset_mfa") {
     const id = text(body.id);
     if (!id) return fail(400, "Akun tidak disebutkan.");
     const { data: target } = await admin.from("profiles").select("role").eq("id", id).maybeSingle();
     if (!target) return fail(404, "Akun tidak ditemukan.");
     if (!mayManage(target.role as Role)) return fail(403, "Purchasing hanya boleh mengubah akun vendor.");
 
+    if (body.action === "reset_mfa") {
+      if (callerRole !== "admin") return fail(403, "Hanya admin yang boleh mereset verifikasi dua langkah.");
+      const { data: listed, error: listError } = await admin.auth.admin.mfa.listFactors({ userId: id });
+      if (listError) return fail(400, `Verifikasi dua langkah gagal dibaca: ${listError.message}`);
+      for (const factor of listed?.factors ?? []) {
+        const { error } = await admin.auth.admin.mfa.deleteFactor({ id: factor.id, userId: id });
+        if (error) return fail(400, `Verifikasi dua langkah gagal direset: ${error.message}`);
+      }
+      return Response.json({ ok: true });
+    }
+
     if (typeof body.password === "string") {
-      if (body.password.length < 8) return fail(400, "Password minimal 8 karakter.");
+      if (body.password.length < MIN_PASSWORD) return fail(400, `Password minimal ${MIN_PASSWORD} karakter.`);
       const { error } = await admin.auth.admin.updateUserById(id, { password: body.password });
       if (error) return fail(400, `Password gagal diubah: ${error.message}`);
     }

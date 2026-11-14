@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { isBuyer, useAuth } from "@/components/Shell";
 import { Empty, ErrorNote, Field, Loading, Modal, Pill, useAction, useLoad } from "@/components/ui";
-import { callUsersApi, loadProducts, loadProfiles, loadVendors } from "@/lib/data";
-import { fmtNum, parseNumber } from "@/lib/format";
+import { callUsersApi, downloadBackup, loadAccountInfo, loadProducts, loadProfiles, loadVendors } from "@/lib/data";
+import { fmtDateTime, fmtNum, parseNumber } from "@/lib/format";
 import { db } from "@/lib/supabase";
 import { ROLE_LABEL, type Product, type Profile, type Role, type Vendor } from "@/lib/types";
 
@@ -239,14 +239,17 @@ function ProductForm({ product, onClose, onDone }: { product?: Product; onClose:
 // ------------------------------- Akun -------------------------------
 function randomPassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  const bytes = new Uint32Array(12);
+  const bytes = new Uint32Array(14);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => chars[b % chars.length]).join("");
 }
 
 function AccountTab() {
   const { profile } = useAuth();
-  const { data, error, loading, reload } = useLoad(async () => ({ profiles: await loadProfiles(), vendors: await loadVendors() }), []);
+  const { data, error, loading, reload } = useLoad(
+    async () => ({ profiles: await loadProfiles(), vendors: await loadVendors(), info: await loadAccountInfo() }),
+    [],
+  );
   const [modal, setModal] = useState<{ t: "new" } | { t: "password"; user: Profile } | null>(null);
   const action = useAction();
   const admin = profile.role === "admin";
@@ -261,6 +264,14 @@ function AccountTab() {
     });
   };
 
+  const resetMfa = (p: Profile) => {
+    if (!window.confirm(`Reset verifikasi dua langkah ${p.full_name}? Saat login berikutnya ia harus mendaftarkan aplikasi autentikator lagi.`)) return;
+    void action.run(async () => {
+      await callUsersApi({ action: "reset_mfa", id: p.id });
+      await reload();
+    });
+  };
+
   return (
     <section className="grid gap-3">
       <div className="flex flex-wrap items-center gap-3">
@@ -269,6 +280,11 @@ function AccountTab() {
             ? "Admin membuat semua jenis akun. Akun vendor hanya melihat PO milik vendornya."
             : "Purchasing membuat akun vendor. Akun purchasing dan QC dibuat oleh admin."}
         </p>
+        {admin ? (
+          <button type="button" className="btn" onClick={() => void action.run(downloadBackup)} disabled={action.busy}>
+            Unduh cadangan data
+          </button>
+        ) : null}
         <button type="button" className="btn btn-primary" onClick={() => setModal({ t: "new" })} disabled={!data}>
           Tambah akun
         </button>
@@ -286,6 +302,8 @@ function AccountTab() {
                 <th>Peran</th>
                 <th>Vendor</th>
                 <th>Status</th>
+                <th>Login terakhir</th>
+                <th>2 langkah</th>
                 <th />
               </tr>
             </thead>
@@ -297,6 +315,20 @@ function AccountTab() {
                   <td>{ROLE_LABEL[p.role]}</td>
                   <td>{vendorName(p.vendor_id)}</td>
                   <td>{p.active ? <Pill tone="ok">Aktif</Pill> : <Pill>Nonaktif</Pill>}</td>
+                  <td className="whitespace-nowrap">
+                    {data?.info[p.id] ? (data.info[p.id].last_sign_in_at ? fmtDateTime(data.info[p.id].last_sign_in_at) : "Belum pernah") : "-"}
+                  </td>
+                  <td>
+                    {!data?.info[p.id] ? (
+                      "-"
+                    ) : data.info[p.id].mfa ? (
+                      <Pill tone="ok">Aktif</Pill>
+                    ) : p.role === "admin" || p.role === "purchasing" ? (
+                      <Pill tone="warn">Belum didaftarkan</Pill>
+                    ) : (
+                      "Tidak wajib"
+                    )}
+                  </td>
                   <td>
                     {mayManage(p) ? (
                       <div className="flex flex-wrap gap-2">
@@ -306,6 +338,11 @@ function AccountTab() {
                         {p.id !== profile.id ? (
                           <button type="button" className="btn btn-sm" onClick={() => setActive(p, !p.active)} disabled={action.busy}>
                             {p.active ? "Nonaktifkan" : "Aktifkan"}
+                          </button>
+                        ) : null}
+                        {admin && data?.info[p.id]?.mfa ? (
+                          <button type="button" className="btn btn-sm btn-danger" onClick={() => resetMfa(p)} disabled={action.busy}>
+                            Reset 2 langkah
                           </button>
                         ) : null}
                       </div>
@@ -379,8 +416,8 @@ function AccountForm({ vendors, roles, onClose, onDone }: { vendors: Vendor[]; r
         <Field label="Email">
           <input id="account-email" className="input" type="email" required autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
-        <Field label="Password awal" hint="Catat dan kirimkan ke pengguna lewat jalur yang aman. Password tidak bisa dilihat lagi setelah disimpan.">
-          <input id="account-password" className="input mono" required minLength={8} autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Field label="Password awal" hint="Minimal 12 karakter. Catat dan kirimkan ke pengguna lewat jalur yang aman. Password tidak bisa dilihat lagi setelah disimpan.">
+          <input id="account-password" className="input mono" required minLength={12} autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         <ErrorNote error={error} />
         <button type="submit" className="btn btn-primary justify-self-end" disabled={busy}>
@@ -408,7 +445,7 @@ function PasswordForm({ user, onClose }: { user: Profile; onClose: () => void })
         }}
       >
         <Field label="Password baru" hint="Catat dan kirimkan ke pengguna lewat jalur yang aman.">
-          <input id="reset-password" className="input mono" required minLength={8} autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input id="reset-password" className="input mono" required minLength={12} autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         <ErrorNote error={error} />
         {saved ? <p className="note note-info">Password sudah diganti.</p> : null}
