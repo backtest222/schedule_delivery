@@ -13,6 +13,7 @@ Pakai proyek **baru**, jangan digabung dengan SaySomething.
    Ini menyiapkan tempat foto bukti penerimaan.
 4. Buat query baru, tempel seluruh isi `supabase/migrations/003_security.sql`, klik **Run**.
    Ini mewajibkan verifikasi dua langkah untuk admin dan purchasing, dan menyiapkan tempat cadangan data.
+   Lalu jalankan juga `supabase/migrations/004_reminders.sql` untuk pengingat email H-3.
 5. Buka **Authentication → Sign In / Providers**, matikan **Allow new users to sign up**.
    Akun hanya boleh dibuat lewat halaman Kelola di website.
 6. Buka **Authentication → Multi-Factor** dan pastikan **TOTP (aplikasi autentikator)** dalam keadaan aktif.
@@ -43,12 +44,15 @@ Saat login pertama, admin diminta mendaftarkan aplikasi autentikator (Google Aut
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (`sb_publishable_...`) |
 | `SUPABASE_SECRET_KEY` | Secret key (`sb_secret_...`). Jangan pernah dibagikan atau di-screenshot. |
-| `CRON_SECRET` | Buat sendiri: teks acak minimal 32 karakter. Dipakai untuk mengamankan cadangan mingguan. |
+| `CRON_SECRET` | Buat sendiri: teks acak minimal 32 karakter. Dipakai untuk mengamankan cadangan mingguan dan pengingat harian. |
+| `RESEND_API_KEY` | Dari resend.com (lihat bagian Pengingat email). |
+| `EMAIL_FROM` | Alamat pengirim, misalnya `Jadwal Pengiriman <notifikasi@domain-anda.com>`. |
+| `NEXT_PUBLIC_SITE_URL` | Alamat website tanpa garis miring di akhir. Dipakai untuk tautan di email. |
 
 ## 4. Deploy ke Vercel
 
 1. Vercel → **Add New → Project** → pilih repo `schedule_delivery` → **Deploy**.
-2. **Settings → Environment Variables**: tambahkan empat variabel di atas.
+2. **Settings → Environment Variables**: tambahkan semua variabel di atas.
 3. **Deployments → titik tiga → Redeploy**.
 4. Buka alamat `.vercel.app` yang diberikan, login dengan akun admin.
 
@@ -84,7 +88,31 @@ Bila ingin memakai domain sendiri (misalnya subdomain `jadwal.` dari domain yang
 **Semua peran**
 - Menu **Aktivitas** adalah pengganti notifikasi. Angka merah di menu menunjukkan kejadian baru. Website belum mengirim email atau WhatsApp.
 
-## 7. Pengamanan
+## 7. Pengingat email H-3
+
+**Cara kerja**
+- Setiap pagi sekitar pukul 07.00 WIB (jadwal Vercel paket gratis bisa meleset sampai satu jam), sistem mencari jadwal yang ETA-nya tinggal **3 hari atau kurang**, PO-nya masih buka, dan volume truk yang sudah didaftarkan vendor **masih kurang** dari volume jadwal. Truk yang dibatalkan tidak dihitung.
+- Vendor menerima **satu email** berisi semua jadwalnya yang kurang: nomor PO, produk, ETA, volume diminta, sudah didaftarkan, kekurangan, dan tautan langsung ke halaman PO.
+- Email dikirim ke **semua akun vendor yang aktif**. Balasan vendor masuk ke email purchasing yang membuat PO.
+- Satu jadwal diingatkan **satu kali per tanggal ETA**. Bila ETA berubah, pengingat berlaku lagi untuk tanggal baru.
+- Bila vendor belum punya akun aktif, atau email gagal dikirim, sistem mencobanya lagi besok pagi, dan purchasing melihatnya di "Perlu perhatian".
+- Hasilnya tercatat di **Kelola → Pengingat email**, di Aktivitas vendor dan purchasing, dan di bawah jadwal pada halaman PO.
+- Di **Kelola → Pengingat email**, purchasing bisa melihat siapa yang akan diingatkan hari ini tanpa mengirim, atau mengirim sekarang.
+
+**Menyiapkan Resend (layanan pengirim email, gratis sampai 100 email per hari)**
+1. Daftar di resend.com.
+2. **Domains → Add Domain**. Pakai domain milik Wang atau perusahaan. Disarankan subdomain khusus, misalnya `notif.domain-anda.com`, agar reputasi email domain utama tidak terganggu.
+3. Resend menampilkan beberapa catatan DNS (jenis TXT dan MX). Masukkan semuanya di panel DNS tempat domain dibeli, misalnya Hostinger → DNS / Nameserver → DNS record. Tunggu sampai status domain di Resend menjadi **Verified**.
+4. **API Keys → Create API Key** dengan izin "Sending access". Salin ke `RESEND_API_KEY` di Vercel. Jangan di-screenshot.
+5. Isi `EMAIL_FROM` dengan alamat di domain yang sudah diverifikasi, lalu Redeploy.
+
+Sebelum domain diverifikasi, Resend hanya mengizinkan pengiriman ke email pemilik akun Resend sendiri. Pengingat ke vendor baru jalan setelah langkah 3 selesai.
+
+**Batas yang perlu diketahui**
+- Satu email ke tiga akun vendor dihitung tiga email. Dengan batas 100 per hari, cukup untuk puluhan vendor per hari.
+- Email otomatis bisa masuk folder spam. Minta vendor menandai alamat pengirim sebagai bukan spam pada email pertama.
+
+## 8. Pengamanan
 
 **Verifikasi dua langkah (2 langkah)**
 - Admin dan purchasing wajib memasukkan kode 6 angka dari aplikasi autentikator setiap login. Tanpa kode itu, database menolak semua permintaan mereka, bukan hanya tampilannya.
@@ -111,13 +139,13 @@ Aktifkan verifikasi dua langkah juga di GitHub, Vercel, Supabase, dan Hostinger.
 3. Atur ulang passwordnya, dan reset 2 langkah bila ia admin atau purchasing.
 4. Aktifkan kembali.
 
-## 8. Rumus yang dipakai
+## 9. Rumus yang dipakai
 
 - Selisih berat = netto vendor − netto pabrik. Ditandai merah bila persentasenya melewati batas produk.
 - Berat diterima = netto pabrik − berat ditolak. Hanya berat diterima yang mengurangi sisa PO.
 - Ketepatan waktu = volume diterima pada atau sebelum ETA, dibagi volume jadwal yang ETA-nya sudah lewat. Dilaporkan terhadap ETA awal dan ETA revisi.
 
-## 9. Checklist uji setelah online
+## 10. Checklist uji setelah online
 
 - [ ] Login admin meminta pendaftaran aplikasi autentikator, lalu berhasil dengan kode 6 angka; password salah ditolak.
 - [ ] Login kedua hanya meminta kode, tidak mendaftar ulang.
@@ -131,11 +159,13 @@ Aktifkan verifikasi dua langkah juga di GitHub, Vercel, Supabase, dan Hostinger.
 - [ ] Purchasing melihat semuanya di "Perlu perhatian", menyetujui usulan, mengunduh Excel, menutup PO.
 - [ ] Setelah PO ditutup, vendor tidak bisa mendaftarkan truk baru.
 - [ ] Admin menekan **Unduh cadangan data** dan mendapat file JSON.
+- [ ] Buat jadwal uji dengan ETA dua hari lagi untuk vendor yang akunnya memakai email Wang sendiri. Di **Kelola → Pengingat email**, tekan "Lihat siapa yang akan diingatkan", lalu "Kirim sekarang". Email masuk dan tautannya membuka PO yang benar.
+- [ ] Vercel **Settings → Cron Jobs** menampilkan `/api/cron/reminders`.
 - [ ] Sehari setelah hari Minggu pertama, ada file `backup-....json` di Supabase → Storage → backups. Di Vercel, **Settings → Cron Jobs** menampilkan `/api/cron/backup`.
 
 Butir soal foto dan cadangan mingguan perlu perhatian khusus, karena penyimpanan file Supabase belum bisa diuji sebelum tersambung ke Supabase asli. Aturan aksesnya sudah diuji; unggah dan unduhnya yang belum.
 
-## 10. Bila ada masalah
+## 11. Bila ada masalah
 
 | Gejala | Penyebab yang paling mungkin |
 |---|---|
@@ -146,6 +176,9 @@ Butir soal foto dan cadangan mingguan perlu perhatian khusus, karena penyimpanan
 | Admin atau purchasing login tetapi semua daftar kosong | `003_security.sql` sudah jalan tetapi verifikasi dua langkah belum selesai. Keluar, lalu login ulang dan masukkan kodenya. |
 | Kode 6 angka selalu ditolak | Jam di HP tidak tepat. Aktifkan waktu otomatis di HP. |
 | Layar 2 langkah menampilkan "gagal" saat mendaftar | TOTP belum aktif di Supabase → Authentication → Multi-Factor. |
+| Pengingat gagal: "RESEND_API_KEY atau EMAIL_FROM belum diisi" | Isi kedua variabel di Vercel, lalu Redeploy. |
+| Pengingat gagal: Resend menolak (403) | Domain pengirim belum Verified di Resend, atau `EMAIL_FROM` memakai domain lain. |
+| Email terkirim tetapi tidak sampai | Periksa folder spam vendor, dan log di resend.com → Emails. |
 | Cadangan mingguan tidak muncul | `CRON_SECRET` belum diisi di Vercel, atau belum Redeploy. |
 | Foto gagal diunggah | `002_storage.sql` belum dijalankan, atau ukuran foto di atas 5 MB. |
 | SQL kedua kali dijalankan muncul "already exists" | Tidak berbahaya. Skema sudah terpasang dari jalan pertama. |

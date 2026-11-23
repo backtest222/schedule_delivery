@@ -2,12 +2,13 @@
 import { useState } from "react";
 import { isBuyer, useAuth } from "@/components/Shell";
 import { Empty, ErrorNote, Field, Loading, Modal, Pill, useAction, useLoad } from "@/components/ui";
-import { callUsersApi, downloadBackup, loadAccountInfo, loadProducts, loadProfiles, loadVendors } from "@/lib/data";
-import { fmtDateTime, fmtNum, parseNumber } from "@/lib/format";
+import { callRemindersApi, callUsersApi, downloadBackup, loadReminderLog, loadAccountInfo, loadProducts, loadProfiles, loadVendors } from "@/lib/data";
+import { fmtDate, fmtDateTime, fmtNum, fmtVolume, parseNumber } from "@/lib/format";
+import type { ReminderRun } from "@/lib/data";
 import { db } from "@/lib/supabase";
 import { ROLE_LABEL, type Product, type Profile, type Role, type Vendor } from "@/lib/types";
 
-type Tab = "vendor" | "produk" | "akun";
+type Tab = "vendor" | "produk" | "akun" | "pengingat";
 
 export default function ManagePage() {
   const { profile } = useAuth();
@@ -17,6 +18,7 @@ export default function ManagePage() {
     ["vendor", "Vendor"],
     ["produk", "Produk"],
     ["akun", "Akun pengguna"],
+    ["pengingat", "Pengingat email"],
   ];
   return (
     <div className="grid gap-4">
@@ -38,6 +40,7 @@ export default function ManagePage() {
       {tab === "vendor" ? <VendorTab /> : null}
       {tab === "produk" ? <ProductTab /> : null}
       {tab === "akun" ? <AccountTab /> : null}
+      {tab === "pengingat" ? <ReminderTab /> : null}
     </div>
   );
 }
@@ -454,5 +457,130 @@ function PasswordForm({ user, onClose }: { user: Profile; onClose: () => void })
         </button>
       </form>
     </Modal>
+  );
+}
+
+// ----------------------------- Pengingat ----------------------------
+const RUN_STATUS = {
+  sent: ["ok", "Terkirim"],
+  failed: ["danger", "Gagal"],
+  no_recipient: ["danger", "Vendor belum punya akun"],
+  preview: ["info", "Akan dikirim"],
+} as const;
+
+function ReminderTab() {
+  const log = useLoad(() => loadReminderLog(50), []);
+  const [run, setRun] = useState<ReminderRun | null>(null);
+  const action = useAction();
+
+  const go = (preview: boolean) => {
+    if (!preview && !window.confirm("Kirim pengingat sekarang ke semua vendor yang jadwalnya belum lengkap?")) return;
+    void action.run(async () => {
+      setRun(await callRemindersApi(preview));
+      if (!preview) await log.reload();
+    });
+  };
+
+  return (
+    <section className="grid gap-4">
+      <div className="card grid gap-2 p-4 text-sm">
+        <p>
+          Setiap pagi sekitar pukul 07.00 WIB, vendor otomatis menerima email bila ada jadwal yang <strong>ETA-nya tinggal 3 hari atau kurang</strong>{" "}
+          tetapi volume truk yang didaftarkan masih kurang dari volume jadwal. Satu jadwal diingatkan satu kali per tanggal ETA. Email dikirim ke semua
+          akun vendor yang aktif, dan balasan vendor masuk ke email purchasing pembuat PO.
+        </p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button type="button" className="btn" onClick={() => go(true)} disabled={action.busy}>
+            Lihat siapa yang akan diingatkan
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => go(false)} disabled={action.busy}>
+            Kirim sekarang
+          </button>
+        </div>
+      </div>
+      <ErrorNote error={action.error ?? log.error} />
+
+      {run ? (
+        <div className="card overflow-x-auto" aria-live="polite">
+          <p className="px-4 pt-3 text-sm font-semibold">
+            {run.schedules === 0
+              ? `Hari ini (${fmtDate(run.today)}) tidak ada jadwal yang perlu diingatkan.`
+              : `${run.schedules} jadwal perlu diingatkan, tanggal ${fmtDate(run.today)}.`}
+          </p>
+          {run.results.length > 0 ? (
+            <table className="tbl mt-2">
+              <thead>
+                <tr>
+                  <th>Vendor</th>
+                  <th className="r">Jadwal</th>
+                  <th>Penerima</th>
+                  <th>Hasil</th>
+                </tr>
+              </thead>
+              <tbody>
+                {run.results.map((r) => (
+                  <tr key={r.vendor}>
+                    <td className="font-semibold">{r.vendor}</td>
+                    <td className="r">{r.schedules}</td>
+                    <td>{r.recipients.length > 0 ? r.recipients.join(", ") : "-"}</td>
+                    <td>
+                      <Pill tone={RUN_STATUS[r.status][0]}>{RUN_STATUS[r.status][1]}</Pill>
+                      {r.error ? <span className="mt-1 block text-xs text-danger">{r.error}</span> : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+        </div>
+      ) : null}
+
+      <h2 className="text-base font-bold">Riwayat pengingat</h2>
+      {log.loading ? (
+        <Loading />
+      ) : !log.data || log.data.length === 0 ? (
+        <Empty title="Belum ada pengingat yang dikirim" />
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Waktu</th>
+                <th>PO dan vendor</th>
+                <th>ETA</th>
+                <th className="r">Kurang</th>
+                <th>Hasil</th>
+              </tr>
+            </thead>
+            <tbody>
+              {log.data.map((r) => (
+                <tr key={r.id}>
+                  <td className="whitespace-nowrap">{fmtDateTime(r.last_try_at)}</td>
+                  <td>
+                    {r.schedule ? (
+                      <a href={`/po/${r.schedule.po.id}`} className="po-no text-denim underline underline-offset-2">
+                        {r.schedule.po.po_number}
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                    <br />
+                    <span className="text-muted">{r.schedule?.po.vendor.name ?? ""}</span>
+                  </td>
+                  <td className="whitespace-nowrap">{fmtDate(r.eta)}</td>
+                  <td className="r">{fmtVolume(r.missing_kg)}</td>
+                  <td>
+                    <Pill tone={RUN_STATUS[r.status][0]}>{RUN_STATUS[r.status][1]}</Pill>
+                    <span className="mt-1 block text-xs text-muted">
+                      {r.status === "sent" ? `${r.recipients.length} penerima` : `${r.attempts} kali dicoba${r.error ? `: ${r.error}` : ""}`}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }

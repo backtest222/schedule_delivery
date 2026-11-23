@@ -10,7 +10,7 @@ import { loadAudit, loadPO, loadProducts, loadProfiles, loadVendors } from "@/li
 import { daysBetween, fmtDate, fmtDateTime, fmtKg, fmtNum, fmtVolume, todayStr } from "@/lib/format";
 import { photoUrls } from "@/lib/photos";
 import { db } from "@/lib/supabase";
-import { REJECT_REASONS, type AuditEntry, type PO, type Proposal, type Schedule, type Truck } from "@/lib/types";
+import { REJECT_REASONS, type AuditEntry, type PO, type Proposal, type Reminder, type Schedule, type Truck } from "@/lib/types";
 
 type ModalState =
   | { t: "editPo" }
@@ -242,6 +242,8 @@ export default function PoPage() {
                     )}
                   </div>
                   <ProgressBar doneKg={st.acceptedKg} plannedKg={st.plannedKg} totalKg={s.volume_kg} />
+
+                  {s.reminders[0] ? <ReminderLine reminder={s.reminders[0]} current={s.reminders[0].eta === s.eta_current} /> : null}
 
                   {pending ? (
                     <div className="note note-warn grid gap-2">
@@ -496,6 +498,24 @@ function TruckRow({ po, truck: t, can, on, busy }: { po: PO; truck: Truck; can: 
         </div>
       ) : null}
     </li>
+  );
+}
+
+function ReminderLine({ reminder: r, current }: { reminder: Reminder; current: boolean }) {
+  if (!current) return null;
+  if (r.status === "sent") {
+    return (
+      <p className="text-sm text-muted">
+        Pengingat email H-3 dikirim {fmtDateTime(r.last_try_at)} ke {r.recipients.length} akun vendor (saat itu kurang {fmtVolume(r.missing_kg)}).
+      </p>
+    );
+  }
+  return (
+    <p className="note note-danger text-sm">
+      Pengingat email H-3 belum terkirim
+      {r.status === "no_recipient" ? ": vendor belum punya akun aktif." : `: ${r.error ?? "gagal dikirim"}.`} Dicoba lagi besok pagi
+      ({r.attempts} kali dicoba).
+    </p>
   );
 }
 

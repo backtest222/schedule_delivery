@@ -4,10 +4,14 @@ import type { Activity, AuditEntry, PO, Product, Profile, Receipt, Schedule, Tru
 
 const PO_SELECT =
   "*, vendor:vendors(id,name), product:products(id,name,tolerance_pct), " +
-  "schedules(*, trucks(*, receipt:receipts(*)), proposals:schedule_proposals(*))";
+  "schedules(*, trucks(*, receipt:receipts(*)), proposals:schedule_proposals(*), reminders:schedule_reminders(*))";
 
 type RawTruck = Omit<Truck, "receipt"> & { receipt: Receipt | Receipt[] | null };
-type RawSchedule = Omit<Schedule, "trucks"> & { trucks: RawTruck[] | null; proposals: Schedule["proposals"] | null };
+type RawSchedule = Omit<Schedule, "trucks" | "reminders"> & {
+  trucks: RawTruck[] | null;
+  proposals: Schedule["proposals"] | null;
+  reminders: Schedule["reminders"] | null;
+};
 type RawPO = Omit<PO, "schedules"> & { schedules: RawSchedule[] | null };
 
 function normalize(raw: RawPO): PO {
@@ -15,6 +19,7 @@ function normalize(raw: RawPO): PO {
     .map((s) => ({
       ...s,
       proposals: [...(s.proposals ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+      reminders: [...(s.reminders ?? [])].sort((a, b) => b.last_try_at.localeCompare(a.last_try_at)),
       trucks: (s.trucks ?? [])
         .map((t) => ({ ...t, receipt: Array.isArray(t.receipt) ? (t.receipt[0] ?? null) : t.receipt }))
         .sort((a, b) => a.departure_at.localeCompare(b.departure_at)),
@@ -111,6 +116,47 @@ export type AccountInfo = Record<string, { last_sign_in_at: string | null; mfa: 
 /** Login terakhir dan status verifikasi dua langkah tiap akun yang boleh dikelola pemanggil. */
 export async function loadAccountInfo(): Promise<AccountInfo> {
   return (await callUsersApi<{ users: AccountInfo }>({ action: "overview" })).users;
+}
+
+export type ReminderRun = {
+  today: string;
+  schedules: number;
+  results: { vendor: string; schedules: number; recipients: string[]; status: "sent" | "failed" | "no_recipient" | "preview"; error?: string }[];
+};
+
+/** Pratinjau (preview: true) atau kirim sekarang pengingat email H-3. */
+export async function callRemindersApi(preview: boolean): Promise<ReminderRun> {
+  const res = await fetch("/api/reminders", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${await bearer()}` },
+    body: JSON.stringify({ preview }),
+  });
+  const json = (await res.json().catch(() => ({}))) as ReminderRun & { error?: string };
+  if (!res.ok) throw new Error(json.error ?? "Pengingat gagal dijalankan.");
+  return json;
+}
+
+export type ReminderLog = {
+  id: number;
+  eta: string;
+  status: "sent" | "failed" | "no_recipient";
+  recipients: string[];
+  missing_kg: number;
+  error: string | null;
+  attempts: number;
+  last_try_at: string;
+  schedule: { po: { id: string; po_number: string; vendor: { name: string } } } | null;
+};
+
+/** Catatan pengingat terakhir, untuk halaman Kelola. */
+export async function loadReminderLog(limit = 50): Promise<ReminderLog[]> {
+  const { data, error } = await db()
+    .from("schedule_reminders")
+    .select("id, eta, status, recipients, missing_kg, error, attempts, last_try_at, schedule:schedules(po:purchase_orders(id, po_number, vendor:vendors(name)))")
+    .order("last_try_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as unknown as ReminderLog[];
 }
 
 /** Mengunduh cadangan seluruh data (hanya admin). */

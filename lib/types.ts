@@ -57,6 +57,19 @@ export type Proposal = {
   decision_note: string | null;
 };
 
+export type Reminder = {
+  id: number;
+  schedule_id: string;
+  eta: string;
+  status: "sent" | "failed" | "no_recipient";
+  recipients: string[];
+  missing_kg: number;
+  error: string | null;
+  attempts: number;
+  first_try_at: string;
+  last_try_at: string;
+};
+
 export type Schedule = {
   id: string;
   po_id: string;
@@ -66,6 +79,7 @@ export type Schedule = {
   created_at: string;
   trucks: Truck[];
   proposals: Proposal[];
+  reminders: Reminder[];
 };
 
 export type PO = {

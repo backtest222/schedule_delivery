@@ -170,6 +170,18 @@ export function BuyerDashboard() {
         items.push({ key: `over-${po.id}`, tone: "warn", href, text: `${po.po_number}: diterima dan rencana truk melebihi volume PO.` });
       }
       for (const s of po.schedules) {
+        const rem = s.reminders[0];
+        if (rem && rem.eta === s.eta_current && rem.status !== "sent") {
+          items.push({
+            key: `rem-${rem.id}`,
+            tone: "danger",
+            href: rem.status === "no_recipient" ? "/kelola" : href,
+            text:
+              rem.status === "no_recipient"
+                ? `${po.po_number}: pengingat email ke ${po.vendor.name} tidak terkirim karena vendor belum punya akun aktif.`
+                : `${po.po_number}: pengingat email ke ${po.vendor.name} gagal dikirim.`,
+          });
+        }
         const pending = s.proposals.find((p) => p.status === "pending");
         if (pending) {
           items.push({

@@ -64,6 +64,18 @@ export function describeActivity(a: Activity): { text: string; tone: Tone } {
       if (flagged) text += ` Selisih berat ${fmtNum(numOf(d.diff_pct))}% melewati batas.`;
       return { text, tone: rejected > 0 ? "danger" : flagged ? "warn" : "ok" };
     }
+    case "reminder_sent":
+      return {
+        text: `Pengingat email H-3 dikirim ke ${numOf(d.recipients)} akun vendor: jadwal ETA ${fmtDate(str(d.eta))} masih kurang ${fmtVolume(numOf(d.missing_kg))} truk.`,
+        tone: "warn",
+      };
+    case "reminder_no_recipient":
+      return {
+        text: `Pengingat email H-3 untuk ETA ${fmtDate(str(d.eta))} tidak terkirim: vendor belum punya akun aktif. Buat akun vendor di halaman Kelola.`,
+        tone: "danger",
+      };
+    case "reminder_failed":
+      return { text: `Pengingat email H-3 untuk ETA ${fmtDate(str(d.eta))} gagal dikirim: ${str(d.error)}`, tone: "danger" };
     case "po_closed":
       return { text: "PO ditutup. Truk baru tidak bisa didaftarkan.", tone: "info" };
     case "po_reopened":

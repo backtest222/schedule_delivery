@@ -22,6 +22,7 @@ Website untuk komunikasi jadwal dan realisasi pengiriman barang setelah PO, anta
 - Setiap perubahan tercatat di riwayat (siapa, kapan, dari apa menjadi apa).
 - Admin dan purchasing wajib verifikasi dua langkah; aturannya ada di database.
 - Cadangan data otomatis setiap minggu, dan admin bisa mengunduh cadangan kapan saja.
+- Pengingat email H-3 ke vendor bila truk yang didaftarkan belum memenuhi volume jadwal.
 
 ## Struktur
 
@@ -43,7 +44,7 @@ npm test        # uji perhitungan (selisih, ketepatan waktu, total PO)
 npm run build   # periksa bahwa website siap di-deploy
 ```
 
-Uji aturan akses (`tests/rls_test.sql`) dijalankan di Postgres biasa setelah `tests/local_stub.sql` dan ketiga file di `supabase/migrations/`.
+Uji aturan akses (`tests/rls_test.sql`) dijalankan di Postgres biasa setelah `tests/local_stub.sql` dan keempat file di `supabase/migrations/`; begitu pula `tests/reminders_test.sql`.
 
 ## Teknologi
 
